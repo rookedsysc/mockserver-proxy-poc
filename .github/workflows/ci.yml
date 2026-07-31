@@ -11,8 +11,8 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Start services
-        run: docker compose up -d --wait upstream mockserver
-      - name: Verify mock and proxy behavior
+        run: docker compose up -d --build --wait mockserver nestjs
+      - name: Verify NestJS OpenAPI mock and proxy behavior
         run: docker compose run --rm verifier
       - name: Show service logs on failure
         if: failure()

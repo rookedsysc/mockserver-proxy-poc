@@ -1,38 +1,35 @@
 services:
-  upstream:
-    image: node:24-alpine
-    working_dir: /app
-    command: ["node", "server.mjs"]
-    volumes:
-      - ./upstream:/app:ro
-    expose:
-      - "8080"
-    healthcheck:
-      test:
-        [
-          "CMD",
-          "node",
-          "-e",
-          "fetch('http://localhost:8080/health').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))",
-        ]
-      interval: 2s
-      timeout: 2s
-      retries: 15
-
   mockserver:
     image: mockserver/mockserver:7.5.0
     ports:
       - "127.0.0.1:1080:1080"
     environment:
       MOCKSERVER_LOG_LEVEL: INFO
-      MOCKSERVER_INITIALIZATION_OPENAPI_PATH: /config/openapi.yaml
-      MOCKSERVER_PROXY_REMOTE_HOST: upstream
-      MOCKSERVER_PROXY_REMOTE_PORT: "8080"
-    volumes:
-      - ./openapi.yaml:/config/openapi.yaml:ro
+      MOCKSERVER_PROXY_REMOTE_HOST: nestjs
+      MOCKSERVER_PROXY_REMOTE_PORT: "3000"
     depends_on:
-      upstream:
-        condition: service_healthy
+      nestjs:
+        condition: service_started
+
+  nestjs:
+    build:
+      context: ./nestjs
+    ports:
+      - "127.0.0.1:3000:3000"
+    environment:
+      MOCKSERVER_URL: http://mockserver:1080
+      PORT: "3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:3000/api/health').then(response => { if (!response.ok) process.exit(1) }).catch(() => process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 15
 
   verifier:
     image: node:24-alpine
@@ -40,10 +37,11 @@ services:
     command: ["node", "smoke.mjs"]
     environment:
       MOCKSERVER_BASE_URL: http://mockserver:1080
+      NESTJS_BASE_URL: http://nestjs:3000
     volumes:
       - ./tests:/app:ro
     depends_on:
       mockserver:
         condition: service_healthy
-      upstream:
+      nestjs:
         condition: service_healthy

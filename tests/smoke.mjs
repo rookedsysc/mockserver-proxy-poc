@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 
-const baseUrl = process.env.MOCKSERVER_BASE_URL ?? "http://localhost:1080";
+const mockServerBaseUrl =
+  process.env.MOCKSERVER_BASE_URL ?? "http://localhost:1080";
+const nestjsBaseUrl = process.env.NESTJS_BASE_URL ?? "http://nestjs:3000";
 
-async function getJson(path) {
+async function getJson(baseUrl, path) {
   const response = await fetch(`${baseUrl}${path}`);
   const responseBody = await response.text();
 
@@ -15,21 +17,34 @@ async function getJson(path) {
   return JSON.parse(responseBody);
 }
 
-const mockResponse = await getJson("/api/users/42");
+const swaggerDocument = await getJson(nestjsBaseUrl, "/docs-json");
+assert.ok(swaggerDocument.paths["/api/users/{userId}"]);
+assert.equal(swaggerDocument.paths["/api/passthrough"], undefined);
+
+const mockResponse = await getJson(mockServerBaseUrl, "/api/users/42");
 assert.deepEqual(mockResponse, {
-  source: "mockserver",
+  source: "nestjs-openapi",
   id: "42",
   name: "Mock User",
 });
 
-const proxyResponse = await getJson("/api/passthrough");
+const proxyResponse = await getJson(mockServerBaseUrl, "/api/passthrough");
 assert.deepEqual(proxyResponse, {
-  source: "real-upstream",
+  source: "nestjs-upstream",
   method: "GET",
   path: "/api/passthrough",
 });
 
-const dashboardResponse = await fetch(`${baseUrl}/mockserver/dashboard`);
+const swaggerUiResponse = await fetch(`${nestjsBaseUrl}/docs`);
+const swaggerUiHtml = await swaggerUiResponse.text();
+
+assert.equal(swaggerUiResponse.status, 200);
+assert.match(swaggerUiResponse.headers.get("content-type") ?? "", /^text\/html/);
+assert.match(swaggerUiHtml, /<title>NestJS Mock Source API<\/title>/);
+
+const dashboardResponse = await fetch(
+  `${mockServerBaseUrl}/mockserver/dashboard`,
+);
 const dashboardHtml = await dashboardResponse.text();
 
 assert.equal(dashboardResponse.status, 200);
@@ -39,4 +54,6 @@ assert.match(
 );
 assert.match(dashboardHtml, /<title>MockServer Dashboard<\/title>/);
 
-console.log("PASS mock response, proxy fallback, and dashboard");
+console.log(
+  "PASS NestJS OpenAPI auto-mock, proxy fallback, Swagger UI, and dashboard",
+);
