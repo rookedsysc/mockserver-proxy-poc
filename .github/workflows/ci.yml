@@ -1,0 +1,22 @@
+name: smoke-test
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  docker-compose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Start services
+        run: docker compose up -d --wait upstream mockserver
+      - name: Verify mock and proxy behavior
+        run: docker compose run --rm verifier
+      - name: Show service logs on failure
+        if: failure()
+        run: docker compose logs
+      - name: Stop services
+        if: always()
+        run: docker compose down --remove-orphans

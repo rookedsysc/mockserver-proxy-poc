@@ -1,0 +1,43 @@
+openapi: 3.1.0
+info:
+  title: MockServer Proxy PoC API
+  version: 1.0.0
+  description: OpenAPI로 생성되는 목 응답과 실제 upstream 프록시를 검증하는 API입니다.
+paths:
+  /api/users/{userId}:
+    get:
+      summary: 사용자 한 명 조회
+      description: 프런트엔드와 QA가 사용할 고정 목 사용자를 반환합니다.
+      operationId: getUser
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: 조회할 사용자의 식별자
+          schema:
+            type: string
+      responses:
+        "200":
+          description: 목 사용자 조회 성공
+          content:
+            application/json:
+              schema:
+                type: object
+                required:
+                  - source
+                  - id
+                  - name
+                properties:
+                  source:
+                    type: string
+                    description: 응답을 만든 서버
+                  id:
+                    type: string
+                    description: 사용자 식별자
+                  name:
+                    type: string
+                    description: 사용자 이름
+              example:
+                source: mockserver
+                id: "42"
+                name: Mock User
