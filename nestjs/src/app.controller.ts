@@ -1,29 +1,23 @@
-import {
-  Controller,
-  Get,
-  Param,
-  ServiceUnavailableException,
-} from "@nestjs/common";
+import { Controller, Get, Param } from "@nestjs/common";
 import {
   ApiExcludeEndpoint,
+  ApiNotFoundResponse,
   ApiOkResponse,
   ApiOperation,
   ApiParam,
   ApiTags,
 } from "@nestjs/swagger";
-import { MockSyncState } from "./mock-sync-state";
+import { UserNotFoundResponseDto } from "./user-not-found-response.dto";
 import { UserResponseDto } from "./user-response.dto";
 
 @ApiTags("users")
 @Controller("api")
 export class AppController {
-  constructor(private readonly mockSyncState: MockSyncState) {}
-
   @Get("users/:userId")
   @ApiOperation({
     summary: "사용자 조회",
     description:
-      "Swagger 명세에서 MockServer expectation이 자동 생성되는 예제 API",
+      "Swagger 명세에서 Mockoon 응답이 자동 생성되는 예제 API",
   })
   @ApiParam({
     name: "userId",
@@ -33,6 +27,10 @@ export class AppController {
   @ApiOkResponse({
     description: "OpenAPI 예시를 이용한 사용자 응답",
     type: UserResponseDto,
+  })
+  @ApiNotFoundResponse({
+    description: "사용자를 찾을 수 없음",
+    type: UserNotFoundResponseDto,
   })
   getUser(@Param("userId") userId: string): UserResponseDto {
     return {
@@ -55,12 +53,6 @@ export class AppController {
   @Get("health")
   @ApiExcludeEndpoint()
   health(): Record<string, string> {
-    if (!this.mockSyncState.isSynchronized()) {
-      throw new ServiceUnavailableException({
-        status: "SYNCING",
-      });
-    }
-
     return {
       status: "UP",
     };

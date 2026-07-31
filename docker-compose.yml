@@ -1,23 +1,10 @@
 services:
-  mockserver:
-    image: mockserver/mockserver:7.5.0
-    ports:
-      - "127.0.0.1:1080:1080"
-    environment:
-      MOCKSERVER_LOG_LEVEL: INFO
-      MOCKSERVER_PROXY_REMOTE_HOST: nestjs
-      MOCKSERVER_PROXY_REMOTE_PORT: "3000"
-    depends_on:
-      nestjs:
-        condition: service_started
-
   nestjs:
     build:
       context: ./nestjs
     ports:
       - "127.0.0.1:3000:3000"
     environment:
-      MOCKSERVER_URL: http://mockserver:1080
       PORT: "3000"
     healthcheck:
       test:
@@ -31,17 +18,66 @@ services:
       timeout: 2s
       retries: 15
 
+  mockoon-sync:
+    build:
+      context: ./mockoon
+    environment:
+      OPENAPI_URL: http://nestjs:3000/docs-json
+      MOCKOON_DATA_FILE: /data/environment.json
+      MOCKOON_PORT: "1080"
+      UPSTREAM_URL: http://nestjs:3000
+    volumes:
+      - ./mockoon:/data
+    depends_on:
+      nestjs:
+        condition: service_healthy
+
+  mockoon:
+    image: mockoon/cli:9.7.0
+    command:
+      [
+        "--data",
+        "/data/environment.json",
+        "--port",
+        "1080",
+        "--hostname",
+        "0.0.0.0",
+        "--proxy",
+        "enabled",
+        "--watch",
+        "--disable-log-to-file",
+      ]
+    ports:
+      - "127.0.0.1:1080:1080"
+    volumes:
+      - ./mockoon:/data:ro
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://localhost:1080/api/users/42').then(() => process.exit(0)).catch(() => process.exit(1))",
+        ]
+      interval: 2s
+      timeout: 2s
+      retries: 15
+    depends_on:
+      mockoon-sync:
+        condition: service_completed_successfully
+
   verifier:
     image: node:24-alpine
     working_dir: /app
     command: ["node", "smoke.mjs"]
     environment:
-      MOCKSERVER_BASE_URL: http://mockserver:1080
+      MOCKOON_BASE_URL: http://mockoon:1080
       NESTJS_BASE_URL: http://nestjs:3000
     volumes:
       - ./tests:/app:ro
+      - ./mockoon:/mockoon:ro
     depends_on:
-      mockserver:
+      mockoon:
         condition: service_healthy
       nestjs:
         condition: service_healthy
